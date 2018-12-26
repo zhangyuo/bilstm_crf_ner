@@ -1,0 +1,6 @@
+model/
+output/
+*.py[cod]
+*$py.class
+loss_log/
+.idea/
