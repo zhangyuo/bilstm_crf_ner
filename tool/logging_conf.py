@@ -47,7 +47,7 @@ MY_LOGGING_CONF = {
     'loggers': {
         "": {
             "level": "INFO",
-            "handlers": ["pingan_console_handler", "pingan_file_handler"]
+            "handlers": ["other_console_handler", "other_file_handler"]
         }
     }
 

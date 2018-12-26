@@ -1,6 +1,6 @@
-# lstm_crf
+# bilstm_crf
 
-基于tensorflow version 0.13，使用lstm神经网络和crf进行序列标注。
+基于tensorflow version 0.13，使用bilstm神经网络和crf进行序列标注。
 
 
 ### 训练模型

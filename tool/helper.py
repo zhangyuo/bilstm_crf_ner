@@ -11,12 +11,14 @@ import re
 import csv
 import numpy as np
 import pandas as pd
+from config.config import *
+from tool.logger import logger
 
 
-def get_embedding(file_path="embedding"):
-    char_id, id_char = load_map("token/char_id")
+def get_embedding(file_path):
+    char_id, id_char = load_map(CHAR_ID_PATH)
     row_index = 0
-    with open(file_path, "r", encoding="utf-8") as fp:
+    with open(file_path, "rb") as fp:
         for row in fp.readlines():
             line = row.strip().split("\t")
             row_index += 1
@@ -163,7 +165,7 @@ def load_map(file_path):
     :return: 
     """
     if not os.path.isfile(file_path):
-        print("文件不存在,生成map")
+        logger.error("id_char文件不存在,不能生成id_char的map")
         exit()
 
     token_id = {}
@@ -172,7 +174,7 @@ def load_map(file_path):
         line = fp.readlines()
         for data in line:
             a = data.strip().split('\t')
-            #print(a)
+            # print(a)
             token, key_id = [i for i in a[0:2]]
             token_id[token] = key_id
             id_token[key_id] = token
@@ -186,16 +188,15 @@ def save_map(id_char, id_label):
     :param id_label: id, label对应关系
     :return:
     """
-	
+
     num = 0
-    with open("token/char_id", "w", encoding='utf8') as fp:
+    with open(CHAR_ID_PATH, "w", encoding='utf8') as fp:
         for idx, char in id_char.items():
             if not char.strip():
-                #print('**',idx)
                 num = num + 1
                 continue
-            fp.writelines(char + "\t" + str(idx-num) + "\n")
-    with open("token/label_id", "w", encoding='utf8') as fp:
+            fp.writelines(char + "\t" + str(idx - num) + "\n")
+    with open(LABEL_ID_PATH, "w", encoding='utf8') as fp:
         for idx, label in id_label.items():
             fp.writelines(label + "\t" + str(idx) + "\n")
 
@@ -206,7 +207,8 @@ def build_map(train_path):
     :param train_path: 训练数据路径
     :return: 字典id-char, id-label
     """
-    df_train = pd.read_csv(train_path, delimiter='\t', quoting=csv.QUOTE_NONE, skip_blank_lines=False, header=None, names=["char", "label"])
+    df_train = pd.read_csv(train_path, delimiter='\t', quoting=csv.QUOTE_NONE, skip_blank_lines=False, header=None,
+                           names=["char", "label"])
 
     # 提取字符及标签
     chars = list(set(df_train["char"][df_train["char"].notnull()]))
@@ -242,7 +244,8 @@ def get_train(train_path, train_val_ratio=0.9, seq_max_len=200):
     :return:
     """
     char_id, id_char, label_id, id_label = build_map(train_path)
-    df_train = pd.read_csv(train_path, delimiter='\t', quoting=csv.QUOTE_NONE, skip_blank_lines=False, header=None, names=["char", "label"])
+    df_train = pd.read_csv(train_path, delimiter='\t', quoting=csv.QUOTE_NONE, skip_blank_lines=False, header=None,
+                           names=["char", "label"])
 
     # 字符、标签转化为数字, 空字符(句子)转化为-1
     df_train["char_id"] = df_train.char.map(lambda xx: -1 if str(xx) == str(np.nan) else char_id[xx])
@@ -265,8 +268,7 @@ def get_train(train_path, train_val_ratio=0.9, seq_max_len=200):
     y_train = y[:val_num]
     x_val = x[val_num:]
     y_val = y[val_num:]
-
-    print("训练集大小:", len(x_train), "验证集大小:", len(y_val))
+    logger.info('训练集大小:%s, 验证集大小:%s\n' % (str(len(x_train)), str(len(y_val))))
     num_chars = len(id_char)
     num_labels = len(id_label)
     data = {'train': [x_train, y_train, x_val, y_val], 'token': [char_id, id_char, label_id, id_label],
@@ -282,13 +284,13 @@ def get_test(test_path, seq_max_len=200, token_path='token/'):
     :param token_path:
     :return:
     """
-    char_id, id_char = load_map(token_path + "char_id")
-    label_id, id_label = load_map(token_path + "label_id")
+    char_id, id_char = load_map(CHAR_ID_PATH)
+    label_id, id_label = load_map(LABEL_ID_PATH)
 
     def map_func(chars):
         char_list = []
         id_list = []
-        if not chars :
+        if not chars:
             char_list.append(-1)
             id_list.append(-1)
         else:
@@ -301,7 +303,7 @@ def get_test(test_path, seq_max_len=200, token_path='token/'):
     test_char = []
     test_id = []
     with open(test_path, 'r', encoding='utf-8') as fp:
-        fline = fp.readlines();
+        fline = fp.readlines()
         for line in fline:
             char_, id_ = map_func(line.strip())
             test_char.extend(char_)

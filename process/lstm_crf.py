@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
     @version: V-17-4-13
-    @author: Linlifang
+    @author: zhangyuo
     @file: lstm_crf.py
     @time: 17-4-13.下午2:55
 """
@@ -13,6 +13,7 @@ from tensorflow.contrib import rnn
 from datetime import datetime
 from tool import helper
 from config.config import *
+from tool.logger import logger
 
 
 class LstmCrf(object):
@@ -48,70 +49,70 @@ class LstmCrf(object):
 
         # 占位符
         self.inputs = tf.placeholder(tf.int32, [None, self.num_steps])  # 句子长度
-        print(self.inputs)
+        logger.info(self.inputs)
         self.targets = tf.placeholder(tf.int32, [None, self.num_steps])  # 标签长度
-        print(self.targets)
+        logger.info(self.targets)
         self.targets_weight = tf.placeholder(tf.float32, [None, self.num_steps])  # 权值
-        print(self.targets_weight)
+        logger.info(self.targets_weight)
         self.targets_transition = tf.placeholder(tf.int32, [None])
-        print(self.targets_transition)
+        logger.info(self.targets_transition)
 
         # 词嵌入
-        #if embedding_matrix:
+        # if embedding_matrix:
         self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
-        print(self.embedding)
-        #else:
-            #self.embedding = tf.get_variable("emb", [self.num_chars, self.emb_dim])
+        logger.info(self.embedding)
+        # else:
+        # self.embedding = tf.get_variable("emb", [self.num_chars, self.emb_dim])
         self.inputs_emb = tf.nn.embedding_lookup(self.embedding, self.inputs)
-        print(self.inputs_emb)
+        logger.info(self.inputs_emb)
         self.inputs_emb = tf.transpose(self.inputs_emb, [1, 0, 2])
-        print(self.inputs_emb)
+        logger.info(self.inputs_emb)
         self.inputs_emb = tf.reshape(self.inputs_emb, [-1, self.emb_dim])
-        print(self.inputs_emb)
+        logger.info(self.inputs_emb)
         self.inputs_emb = tf.split(self.inputs_emb, self.num_steps, 0)
-        print(self.inputs_emb)
+        logger.info(self.inputs_emb)
 
         # lstm 神经元,隐藏层100
         lstm_cell_fw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
-        print(lstm_cell_fw)
+        logger.info(lstm_cell_fw)
         lstm_cell_bw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
-        print(lstm_cell_bw)
+        logger.info(lstm_cell_bw)
 
         # dropout 避免过拟合
         if is_training:
             lstm_cell_fw = tf.nn.rnn_cell.DropoutWrapper(lstm_cell_fw, output_keep_prob=(1 - self.dropout_rate))
-            print(lstm_cell_fw)
+            logger.info(lstm_cell_fw)
             lstm_cell_bw = tf.nn.rnn_cell.DropoutWrapper(lstm_cell_bw, output_keep_prob=(1 - self.dropout_rate))
-            print(lstm_cell_bw)
+            logger.info(lstm_cell_bw)
 
         # 层数
         lstm_cell_fw = tf.nn.rnn_cell.MultiRNNCell([lstm_cell_fw] * self.num_layers)
-        print(lstm_cell_fw)
+        logger.info(lstm_cell_fw)
         lstm_cell_bw = tf.nn.rnn_cell.MultiRNNCell([lstm_cell_bw] * self.num_layers)
-        print(lstm_cell_bw)
+        logger.info(lstm_cell_bw)
 
         # get the length of each sample
         self.length = tf.reduce_sum(tf.sign(self.inputs), reduction_indices=1)
-        print(self.length)
+        logger.info(self.length)
         self.length = tf.cast(self.length, tf.int32)
-        print(self.length)
+        logger.info(self.length)
 
         # forward and backward
         self.outputs, _, _ = rnn.static_bidirectional_rnn(lstm_cell_fw, lstm_cell_bw, self.inputs_emb, dtype=tf.float32,
-                                                     sequence_length=self.length)
-        print(self.outputs)
-        #此时self.outputs为shape[num_steps][batch,hidden_size]
+                                                          sequence_length=self.length)
+        logger.info(self.outputs)
+        # 此时self.outputs为shape[num_steps][batch,hidden_size]
 
         # softmax
         self.outputs = tf.reshape(tf.concat(self.outputs, 1), [-1, self.hidden_dim * 2])
-        print(self.outputs)
-        #把上述输出展开成[batch, hidden_size*num_steps],然后 reshape, 成[batch*numsteps, hidden_size]
+        logger.info(self.outputs)
+        # 把上述输出展开成[batch, hidden_size*num_steps],然后 reshape, 成[batch*numsteps, hidden_size]
         self.softmax_w = tf.get_variable("softmax_w", [self.hidden_dim * 2, self.num_classes])
-        print(self.softmax_w)
+        logger.info(self.softmax_w)
         self.softmax_b = tf.get_variable("softmax_b", [self.num_classes])
-        print(self.softmax_b)
+        logger.info(self.softmax_b)
         self.logits = tf.matmul(self.outputs, self.softmax_w) + self.softmax_b
-        print(self.logits)
+        logger.info(self.logits)
         # ————>tf.nn.softmax(logits)??
 
         if not is_crf:
@@ -233,7 +234,7 @@ class LstmCrf(object):
             np.random.shuffle(sh_index)
             x_train = x_train[sh_index]
             y_train = y_train[sh_index]
-            print("\n当前迭代次数: ", epoch)
+            logger.info("\n当前迭代次数: ", epoch)
             for iteration in range(num_iterations):
                 # train 选取128条数据
                 x_train_batch, y_train_batch = helper.next_batch(x_train, y_train,
@@ -258,8 +259,8 @@ class LstmCrf(object):
                     precision_train, recall_train, f1_train = self.evaluate(x_train_batch, y_train_batch,
                                                                             predicts_train, id_char, id_label)
                     summary_writer_train.add_summary(train_summary, cnt)
-                    print("训练集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
-                          % (iteration, loss_train, precision_train, recall_train, f1_train))
+                    logger.info("训练集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
+                                % (iteration, loss_train, precision_train, recall_train, f1_train))
 
                 # 验证集
                 if iteration % 10 == 0:
@@ -277,14 +278,14 @@ class LstmCrf(object):
                     precision_val, recall_val, f1_val = self.evaluate(x_val_batch, y_val_batch, predicts_val, id_char,
                                                                       id_label)
                     summary_writer_val.add_summary(val_summary, cnt)
-                    print("验证集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
-                          % (iteration, loss_val, precision_val, recall_val, f1_val))
+                    logger.info("验证集::\t循环: %3d, loss: %3d, 准确率: %.3f, 召回率: %.3f, f1: %.3f"
+                                % (iteration, loss_val, precision_val, recall_val, f1_val))
 
                     if f1_val >= self.max_f1:
-                        print("\n---------------\n*保存模型.....")
+                        logger.info("\n---------------\n*保存模型.....")
                         self.max_f1 = f1_val
                         saver.save(sess, save_file)
-                        print("*f1: %.4f\n---------------\n" % self.max_f1)
+                        logger.info("*f1: %.4f\n---------------\n" % self.max_f1)
 
     def test(self, sess, test_data, output_path):
         """
@@ -298,15 +299,15 @@ class LstmCrf(object):
         char_id, id_char, label_id, id_label = test_data['token']
 
         num_iterations = int(math.ceil(1.0 * len(x_test) / self.batch_size))
-        print("总迭代步数: ", num_iterations)
+        logger.info("总迭代步数: ", num_iterations)
 
         with open(output_path, "w") as fp:
             for iterations in range(num_iterations):
-                print("迭代步数: ", iterations + 1)
+                logger.info("迭代步数: ", iterations + 1)
                 test_batch, test_str_batch = helper.next_test_batch(x_test, x_test_str, iterations * self.batch_size)
                 results = self.predict_batch(sess, test_batch, test_str_batch, id_label)
-                for (x,y) in results:
-                    #fp.writelines(result + "\n")
+                for (x, y) in results:
+                    # fp.writelines(result + "\n")
                     if not y.strip():
                         fp.writelines(y)
                     else:
@@ -346,7 +347,7 @@ class LstmCrf(object):
         length, max_scores, max_scores_pre = sess.run([self.length, self.max_scores, self.max_scores_pre],
                                                       feed_dict={self.inputs: x_id})
         predicts = self.viterbi(max_scores, max_scores_pre, length, self.batch_size)
-        #results = []
+        # results = []
         x_ori = []
         y_pre = []
         for i in range(len(predicts)):
@@ -360,10 +361,10 @@ class LstmCrf(object):
                 if val != 15 and val != 0:
                     y_pre.append(id_label[str(val)])
             y_pre.append('\n')
-        results = zip(x_ori,y_pre)
-            #y_pre = '&'.join([id_label[str(val)] for val in predicts[i] if val != 15 and val != 0])
-            #entity = '_'.join(helper.extract_entity(x, y_pre))
-            #results.append('<@>'.join([x, entity]))
+        results = zip(x_ori, y_pre)
+        # y_pre = '&'.join([id_label[str(val)] for val in predicts[i] if val != 15 and val != 0])
+        # entity = '_'.join(helper.extract_entity(x, y_pre))
+        # results.append('<@>'.join([x, entity]))
         return results
 
     @staticmethod
@@ -403,21 +404,21 @@ class LstmCrf(object):
         return precision, recall, f1
 
 
-def train():
+def train_process():
     """
     函数说明: 训练模型
     :return:
     """
     start = datetime.now()
-    print('开始训练模型:', start, '\n')
-    train_data = helper.get_train(train_path=train_path, seq_max_len=num_steps)
+    logger.info('开始训练模型:%s' % str(start))
+    train_data = helper.get_train(train_path=train_path, seq_max_len=SENT_LENGTH)
     num_chars, num_labels = train_data['number']
-    print('字符个数:',num_chars,'标签个数:',num_labels)
+    logger.info('字符个数:%s, 标签个数:%s' % (str(num_chars), str(num_labels)))
 
     embedding_matrix = helper.get_embedding(emb_path) if emb_path else None
 
     config = tf.ConfigProto(allow_soft_placement=True)
-    kwarg = {'num_chars': num_chars, 'num_classes': num_labels, 'num_steps': num_steps, 'num_epochs': num_epochs,
+    kwarg = {'num_chars': num_chars, 'num_classes': num_labels, 'num_steps': SENT_LENGTH, 'num_epochs': num_epochs,
              'embedding_matrix': embedding_matrix, 'is_training': True}
 
     with tf.Session(config=config) as sess:
@@ -426,28 +427,28 @@ def train():
             with tf.variable_scope("model", reuse=None, initializer=initializer):
                 model = LstmCrf(**kwarg)
                 tf.global_variables_initializer().run()
-                print('\n正在训练模型...')
+                logger.info('\n正在训练模型...')
                 model.train(sess, model_path, train_data)
 
-                print('正确率: ', model.max_f1)
+                logger.info('正确率: ', model.max_f1)
                 end = datetime.now()
-                print('\n结束模型训练:', end, '\n训练模型耗时:', end - start)
+                logger.info('\n结束模型训练:', end, '\n训练模型耗时:', end - start)
 
 
-def test():
+def test_process():
     """
     函数说明: 序列标注
     :return:
     """
     start = datetime.now()
-    print('开始测试数据:', start, '\n')
-    test_data = helper.get_test(test_path=test_path, seq_max_len=num_steps)
+    logger.info('开始测试数据:', start, '\n')
+    test_data = helper.get_test(test_path=test_path, seq_max_len=SENT_LENGTH)
     num_chars, num_labels = test_data['number']
 
     embedding_matrix = helper.get_embedding(emb_path) if emb_path else None
 
     config = tf.ConfigProto(allow_soft_placement=True)
-    kwarg = {'num_chars': num_chars, 'num_classes': num_labels, 'num_steps': num_steps, 'num_epochs': num_epochs,
+    kwarg = {'num_chars': num_chars, 'num_classes': num_labels, 'num_steps': SENT_LENGTH, 'num_epochs': num_epochs,
              'embedding_matrix': embedding_matrix, 'is_training': False}
 
     with tf.Session(config=config) as sess:
@@ -457,12 +458,12 @@ def test():
                 model = LstmCrf(**kwarg)
                 saver = tf.train.Saver()
                 saver.restore(sess, model_path)
-                print('\n正在测试数据...')
+                logger.info('\n正在测试数据...')
                 model.test(sess, test_data, output_path)
 
                 end = datetime.now()
-                print('\n结束测试数据:', end, '\n测试数据耗时:', end - start)
+                logger.info('\n结束测试数据:', end, '\n测试数据耗时:', end - start)
+
 
 if __name__ == '__main__':
-    train()
-    # test()
+    train_process()
