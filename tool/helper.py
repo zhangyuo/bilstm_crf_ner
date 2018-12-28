@@ -175,7 +175,7 @@ def load_map(file_path):
     with open(file_path, 'r', encoding='UTF-8') as fp:
         line = fp.readlines()
         for data in line:
-            a = data.strip().split('\t')
+            a = data.replace('\n', '').split('\t')
             # print(a)
             token, key_id = [i for i in a[0:2]]
             token_id[token] = key_id
@@ -194,9 +194,9 @@ def save_map(id_char, id_label):
     num = 0
     with open(CHAR_ID_PATH, "w", encoding='utf8') as fp:
         for idx, char in id_char.items():
-            if not char.strip():
-                num = num + 1
-                continue
+            # if not char.strip():
+            #     num = num + 1
+            #     continue
             fp.writelines(char + "\t" + str(idx - num) + "\n")
     with open(LABEL_ID_PATH, "w", encoding='utf8') as fp:
         for idx, label in id_label.items():

@@ -61,7 +61,7 @@ class LstmCrf(object):
         logger.info(self.targets_transition)
 
         # 词嵌入
-        if embedding_matrix:
+        if embedding_matrix.__str__() != 'None':
             self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
         else:
             self.embedding = tf.get_variable("emb", [self.num_chars, self.emb_dim])
@@ -116,7 +116,7 @@ class LstmCrf(object):
         logger.info(self.softmax_b)
         self.logits = tf.matmul(self.outputs, self.softmax_w) + self.softmax_b
         logger.info(self.logits)
-        # ————>tf.nn.softmax(logits)?? crf层进行softmax,crf层使用lstm输出层值-emission score, crf层训练转移函数
+        # ————>tf.nn.softmax(logits)?? crf层进行softmax,crf层使用lstm输出层值-emission score, crf层训练转移矩阵
 
         if not is_crf:
             pass
@@ -237,7 +237,7 @@ class LstmCrf(object):
             np.random.shuffle(sh_index)
             x_train = x_train[sh_index]
             y_train = y_train[sh_index]
-            logger.info("\n当前迭代次数: %s" % epoch)
+            logger.info("当前迭代次数: %s" % epoch)
             for iteration in range(num_iterations):
                 # train 选取128条数据
                 x_train_batch, y_train_batch = helper.next_batch(x_train, y_train,
@@ -285,10 +285,10 @@ class LstmCrf(object):
                                 % (iteration, loss_val, precision_val, recall_val, f1_val))
 
                     if f1_val >= self.max_f1:
-                        logger.info("\n---------------\n*保存模型.....")
+                        logger.info("---------------*保存模型.....")
                         self.max_f1 = f1_val
                         saver.save(sess, save_file)
-                        logger.info("*f1: %.4f\n---------------\n" % self.max_f1)
+                        logger.info("*f1: %.4f---------------" % self.max_f1)
 
     def test(self, sess, test_data, output_path):
         """
@@ -430,11 +430,11 @@ def train_process():
             with tf.variable_scope("model", reuse=None, initializer=initializer):
                 model = LstmCrf(**kwarg)
                 tf.global_variables_initializer().run()
-                logger.info('\n正在训练模型...')
+                logger.info('正在训练模型...')
                 model.train(sess, model_path, train_data)
                 logger.info('正确率: %s' % str(model.max_f1))
                 end = datetime.now()
-                logger.info('\n结束模型训练:%s, \n训练模型耗时:%s' % (str(end), str(end - start)))
+                logger.info('结束模型训练:%s, 训练模型耗时:%s' % (str(end), str(end - start)))
 
 
 def test_process():
