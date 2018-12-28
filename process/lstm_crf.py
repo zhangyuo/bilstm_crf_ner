@@ -22,25 +22,28 @@ class LstmCrf(object):
     """
 
     def __init__(self, num_chars, num_classes, num_steps=200, num_epochs=100, embedding_matrix=None, is_training=True,
-                 is_crf=True, weight=False):
+                 is_crf=True):
         """
         函数说明: 类初始化
         :param num_chars: 字符个数
         :param num_classes: 标签个数
-        :param num_steps: 句子步长, 默认200
+        :param num_steps: 句子长度, 默认200
         :param num_epochs: 迭代次数, 默认100
         :param embedding_matrix: 词向量
         :param is_training: 是否训练
         :param is_crf: crf分词
-        :param weight:
         """
-        # 参数
+        # 模型迭代正确率
         self.max_f1 = 0
         self.learning_rate = 0.002
         self.dropout_rate = 0.5
+        # 批大小-输入层一次输入训练句子个数
         self.batch_size = 128
+        # 隐层层数
         self.num_layers = 1
+        # 词向量维度
         self.emb_dim = 300
+        # 隐含层神经元个数
         self.hidden_dim = 100
         self.num_epochs = num_epochs
         self.num_steps = num_steps
@@ -58,11 +61,11 @@ class LstmCrf(object):
         logger.info(self.targets_transition)
 
         # 词嵌入
-        # if embedding_matrix:
-        self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
+        if embedding_matrix:
+            self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
+        else:
+            self.embedding = tf.get_variable("emb", [self.num_chars, self.emb_dim])
         logger.info(self.embedding)
-        # else:
-        # self.embedding = tf.get_variable("emb", [self.num_chars, self.emb_dim])
         self.inputs_emb = tf.nn.embedding_lookup(self.embedding, self.inputs)
         logger.info(self.inputs_emb)
         self.inputs_emb = tf.transpose(self.inputs_emb, [1, 0, 2])
@@ -72,7 +75,7 @@ class LstmCrf(object):
         self.inputs_emb = tf.split(self.inputs_emb, self.num_steps, 0)
         logger.info(self.inputs_emb)
 
-        # lstm 神经元,隐藏层100
+        # lstm 隐层神经元
         lstm_cell_fw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
         logger.info(lstm_cell_fw)
         lstm_cell_bw = tf.nn.rnn_cell.BasicLSTMCell(self.hidden_dim)
@@ -85,7 +88,7 @@ class LstmCrf(object):
             lstm_cell_bw = tf.nn.rnn_cell.DropoutWrapper(lstm_cell_bw, output_keep_prob=(1 - self.dropout_rate))
             logger.info(lstm_cell_bw)
 
-        # 层数
+        # 隐层个数
         lstm_cell_fw = tf.nn.rnn_cell.MultiRNNCell([lstm_cell_fw] * self.num_layers)
         logger.info(lstm_cell_fw)
         lstm_cell_bw = tf.nn.rnn_cell.MultiRNNCell([lstm_cell_bw] * self.num_layers)
@@ -103,7 +106,7 @@ class LstmCrf(object):
         logger.info(self.outputs)
         # 此时self.outputs为shape[num_steps][batch,hidden_size]
 
-        # softmax
+        # 输出层
         self.outputs = tf.reshape(tf.concat(self.outputs, 1), [-1, self.hidden_dim * 2])
         logger.info(self.outputs)
         # 把上述输出展开成[batch, hidden_size*num_steps],然后 reshape, 成[batch*numsteps, hidden_size]
@@ -113,7 +116,7 @@ class LstmCrf(object):
         logger.info(self.softmax_b)
         self.logits = tf.matmul(self.outputs, self.softmax_w) + self.softmax_b
         logger.info(self.logits)
-        # ————>tf.nn.softmax(logits)??
+        # ————>tf.nn.softmax(logits)?? crf层进行softmax,crf层使用lstm输出层值-emission score, crf层训练转移函数
 
         if not is_crf:
             pass
@@ -221,8 +224,8 @@ class LstmCrf(object):
         char_id, id_char, label_id, id_label = train_data['token']
 
         merged = tf.summary.merge_all()
-        summary_writer_train = tf.summary.FileWriter('loss_log/train_loss', sess.graph)
-        summary_writer_val = tf.summary.FileWriter('loss_log/val_loss', sess.graph)
+        summary_writer_train = tf.summary.FileWriter('../output/loss_log/train_loss', sess.graph)
+        summary_writer_val = tf.summary.FileWriter('../output/loss_log/val_loss', sess.graph)
 
         # 每次训练128条语句
         num_iterations = int(math.ceil(1.0 * len(x_train) / self.batch_size))
@@ -234,7 +237,7 @@ class LstmCrf(object):
             np.random.shuffle(sh_index)
             x_train = x_train[sh_index]
             y_train = y_train[sh_index]
-            logger.info("\n当前迭代次数: ", epoch)
+            logger.info("\n当前迭代次数: %s" % epoch)
             for iteration in range(num_iterations):
                 # train 选取128条数据
                 x_train_batch, y_train_batch = helper.next_batch(x_train, y_train,
@@ -429,10 +432,9 @@ def train_process():
                 tf.global_variables_initializer().run()
                 logger.info('\n正在训练模型...')
                 model.train(sess, model_path, train_data)
-
-                logger.info('正确率: ', model.max_f1)
+                logger.info('正确率: %s' % str(model.max_f1))
                 end = datetime.now()
-                logger.info('\n结束模型训练:', end, '\n训练模型耗时:', end - start)
+                logger.info('\n结束模型训练:%s, \n训练模型耗时:%s' % (str(end), str(end - start)))
 
 
 def test_process():

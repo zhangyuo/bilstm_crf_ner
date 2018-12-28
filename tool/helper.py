@@ -11,27 +11,29 @@ import re
 import csv
 import numpy as np
 import pandas as pd
+
 from config.config import *
 from tool.logger import logger
 
 
 def get_embedding(file_path):
     char_id, id_char = load_map(CHAR_ID_PATH)
-    row_index = 0
-    with open(file_path, "rb") as fp:
-        for row in fp.readlines():
-            line = row.strip().split("\t")
-            row_index += 1
-            if row_index == 1:
-                num_chars = int(line[0])
-                emb_dim = int(line[1])
-                emb_matrix = np.zeros((len(char_id), emb_dim))
-                continue
-            char = line[0]
-            emb_vec = [float(val) for val in line[1:]]
-            if char in char_id:
-                a = int(char_id[char])
-                emb_matrix[a] = emb_vec
+    with open(file_path, "r") as fp:
+        emb_matrix = dict()
+        lines = fp.readlines()
+        for index, line in enumerate(lines):
+            line = line.strip()
+            if line:
+                seg = line.split('\t')
+                if index == 0:
+                    emb_dim = int(seg[1])
+                    emb_matrix = np.zeros((len(char_id), emb_dim))
+                else:
+                    char = seg[0]
+                    emb_vec = [float(val) for val in seg[1:]]
+                    if char in char_id:
+                        a = int(char_id[char])
+                        emb_matrix[a] = emb_vec
     return emb_matrix
 
 
@@ -268,7 +270,7 @@ def get_train(train_path, train_val_ratio=0.9, seq_max_len=200):
     y_train = y[:val_num]
     x_val = x[val_num:]
     y_val = y[val_num:]
-    logger.info('训练集大小:%s, 验证集大小:%s\n' % (str(len(x_train)), str(len(y_val))))
+    logger.info('训练集大小:%s, 验证集大小:%s' % (str(len(x_train)), str(len(y_val))))
     num_chars = len(id_char)
     num_labels = len(id_label)
     data = {'train': [x_train, y_train, x_val, y_val], 'token': [char_id, id_char, label_id, id_label],
